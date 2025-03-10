@@ -8,7 +8,7 @@ class SequenceWithNegDataset(Dataset):
       1) input_pos.txt: каждая строка — последовательность позитивных itemid
       2) input_neg.txt: соответствующая строка — последовательность негативных itemid
 
-    При этом предполаганм, что длины строк совпадают по индексам
+    длины строк ghb этом должны совпасть по индексам
     или, как минимум, они соответствуют одному пользователю, но длины могут различаться
 
     В __getitem__(idx) возвращаем (pos_list, neg_list).
@@ -99,14 +99,14 @@ def collate_val_test(batch):
 
 def not_to_recommend_collate(batch, pad_value):
     """
-    Коллатер для train. На входе список кортежей (pos_seq, neg_seq).
-    Нужно сформировать общий батч.
+    коллатер для train
+    формиуем общий батч
     Каждую позицию в pos_seq считаем позитивным примером (label=1),
     в neg_seq — негативным (label=0).
     Возвращаем: (batch_items, batch_labels),
     где batch_items.shape = [B, 2, max_len], batch_labels.shape = [B, 2, max_len].
-    Или собираем их подряд. Здесь есть много вариантов;
-    используем "склеить по размерности seq_len" и хранить отдельно mask.
+    Или собираем их подряд. Здесь есть несколько вариантов;
+    используем: "склеиваем по размерности seq_len" и храним отдельно mask.
     """
 
     # batch_pos.shape = [B, max_len], batch_neg.shape = [B, max_len]
