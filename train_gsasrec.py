@@ -107,23 +107,23 @@ for epoch in range(config.max_epochs):
         # SASRec предсказывает "следующий item" по последнему hidden,
         # но если хотим просто "точечно" получить логиты для самих pos_seq,
         # можно сделать скалярное произв.
-        # Например, logits_pos[b, t] = dot( last_hidden_pos[b, t], E[item=t] ).
-        # Но проще "head" сделать для каждого item:
-        # в gSASRec по умолчанию get_predictions() смотрит на последний шаг.
-        # Поэтрму, чтобы воспроизвести логику "по всем позициям", нужнр вычислять logits.
-        # допустим: logits = W * hidden (linear), а itemID - часть лейбла.
+        # Напримр logits_pos[b, t] = dot( last_hidden_pos[b, t], E[item=t] )
+        # Но наверн проще "head" сделать для каждого item:
+        # в gSASRec по умолчанию get_predictions() смотрит на последний шаг
+        # поэтрму, чтобы воспроизвести логику "по всем позициям", нужно вычислять logits.
+        # logits = W * hidden (linear), а itemID - часть лейбла.
         # Берем:
         # logits_pos[b,t] = < last_hidden_pos[b,t], output_embedding(pos_seq[b,t]) >
 
         output_embeddings = model.get_output_embeddings().weight  # shape [num_items+2, emb]
         # собираем вектор для каждого pos_seq[b,t]
-        # pos_seq[b,t] — это индекс itemID (с учётом паддинга)
+        # pos_seq[b,t] - индекс itemID (с учётом паддинга)
         # для удобства:
         bsz, seqlen = pos_seq.shape
         # создаем logits_pos[b, t] = dot( hidden[b,t], emb_of_item( pos_seq[b,t] ) )
         hidden_dim = last_hidden_pos.size(-1)
         emb_pos = output_embeddings[pos_seq.view(-1)]  # shape [B*seqlen, emb]
-        hidden_pos = last_hidden_pos.view(-1, hidden_dim)  # same
+        hidden_pos = last_hidden_pos.view(-1, hidden_dim)
         logits_pos = torch.sum(hidden_pos * emb_pos, dim=-1)  # [B*seqlen]
         logits_pos = logits_pos.view(bsz, seqlen)            # [B, seqlen]
 
