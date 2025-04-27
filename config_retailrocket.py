@@ -14,6 +14,6 @@ config = GSASRecExperimentConfig(
     reuse_item_embeddings=False,
     metrics=[nDCG@10, R@1, R@10],
     val_metric=nDCG@10,
-    early_stopping_patience=20,
+    early_stopping_patience=50,
     max_epochs=10000
 )
