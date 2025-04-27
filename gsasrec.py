@@ -56,7 +56,6 @@ class GSASRec(nn.Module):
         """item_ids, action_ids — shape [B,S]"""
         bsz, seqlen = item_ids.shape
 
-        # --- эмбеддинги ------------------------------------------------
         it_emb = self.item_embedding(item_ids)  # [B,S,E]
 
         pos_ids = torch.arange(seqlen, device=item_ids.device).unsqueeze(0)
