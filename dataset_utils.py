@@ -6,7 +6,7 @@ from torch.utils.data import Dataset, DataLoader
 
 class SequenceDataset(Dataset):
     """
-    Ожидаем, что input_file содержит строки вида:
+    input_file содержит строки вида:
       item1,label1 item2,label2 ...
     где label=0 или 1, а -1 не встречается.
     Для валидации/теста есть output_file (один item),
