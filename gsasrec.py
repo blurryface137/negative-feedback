@@ -56,6 +56,7 @@ class GSASRec(nn.Module):
         """item_ids, action_ids — shape [B,S]"""
         bsz, seqlen = item_ids.shape
 
+        # --- эмбеддинги ------------------------------------------------
         it_emb = self.item_embedding(item_ids)  # [B,S,E]
 
         pos_ids = torch.arange(seqlen, device=item_ids.device).unsqueeze(0)
@@ -88,10 +89,16 @@ class GSASRec(nn.Module):
         seq_emb, _, _ = self.forward(items_batch, actions_batch)
         bsz, seqlen, _ = seq_emb.shape
 
+        actions_batch = torch.where(actions_batch == -1, torch.zeros_like(actions_batch), actions_batch) # добавил эту строку
         pos_mask = (actions_batch == 1)
-        positions = torch.arange(seqlen, device=actions_batch.device).expand_as(actions_batch)
-        last_pos_idx = torch.where(pos_mask, positions, torch.zeros_like(positions)).argmax(dim=1)
-        last_emb = seq_emb[torch.arange(bsz, device=items_batch.device), last_pos_idx, :]
+        if pos_mask.sum(1).min() == 0:
+            # fallback: последний непаддинг, если нет покупок
+            no_pos = (pos_mask.sum(1) == 0)
+            last_valid = (items_batch != self.num_items + 1).sum(1) - 1
+            last_pos_idx = torch.where(
+             no_pos.unsqueeze(1), last_valid.unsqueeze(1), 
+             torch.where(pos_mask, positions, zeros)
+            ).argmax(dim=1)
 
         out_emb = self.get_output_embeddings().weight
         scores  = torch.einsum("bd,nd->bn", last_emb, out_emb)
