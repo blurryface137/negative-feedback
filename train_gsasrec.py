@@ -3,6 +3,7 @@ import os
 import torch
 from torchinfo import summary
 from tqdm import tqdm
+import random
 
 from utils import load_config, build_model, get_device
 from dataset_utils import get_num_items, get_train_dataloader, get_val_dataloader
@@ -15,6 +16,8 @@ np.random.seed(SEED)
 torch.manual_seed(SEED)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(SEED)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 
 models_dir = "models"
@@ -22,7 +25,7 @@ if not os.path.exists(models_dir):
     os.mkdir(models_dir)
 
 parser = ArgumentParser()
-parser.add_argument('--config', type=str, default='config_retailrocket.py')
+parser.add_argument('--config', type=str, default='config_rc15.py')
 if any('jupyter' in arg for arg in sys.argv) or any('ipykernel' in arg for arg in sys.argv):
     args, unknown = parser.parse_known_args([])
 else:
@@ -65,8 +68,8 @@ def not_to_recommend_loss(logits, labels, mask):
     preds = torch.sigmoid(logits)
     eps = 1e-8
     
-    pos_weight = 1.20
-    neg_weight = 0.01
+    pos_weight = 3.00
+    neg_weight = 0.60
 
     pos_mask = (labels == 1).float() * mask
     neg_mask = (labels == 0).float() * mask
@@ -77,6 +80,35 @@ def not_to_recommend_loss(logits, labels, mask):
     
     denom = torch.sum(pos_mask + neg_mask) + eps
     return loss_elm.sum() / denom
+
+
+
+# def not_to_recommend_loss(logits, labels, mask, base_pos_weight=1.0, base_neg_weight=0.3):
+#     logits = logits.clamp(-10, 10)
+#     preds = torch.sigmoid(logits)
+#     eps = 1e-8
+
+#     pos_mask = (labels == 1).float() * mask
+#     neg_mask = (labels == 0).float() * mask
+
+#     # Доля позитивов и негативов в текущем батче
+#     num_pos = pos_mask.sum()
+#     num_neg = neg_mask.sum()
+
+#     # Адаптивные веса
+#     if num_neg > 0:
+#         neg_weight = base_neg_weight * (num_pos / num_neg)
+#     else:
+#         neg_weight = base_neg_weight
+
+#     pos_weight = base_pos_weight
+
+#     loss_pos = -pos_weight * torch.log(preds + eps) * pos_mask
+#     loss_neg = -neg_weight * torch.log(1.0 - preds + eps) * neg_mask
+#     loss_elm = loss_pos + loss_neg
+
+#     denom = torch.sum(pos_mask + neg_mask) + eps
+#     return loss_elm.sum() / denom
 
 
 def negative_regularization(neg_out, weight=1e-3):
@@ -101,9 +133,9 @@ for epoch in range(config.max_epochs):
         actions_batch = actions_batch.to(device)
 
         # forward => seq_emb, neg_out
-        inp_items   = items_batch[:, :-1]
+        inp_items = items_batch[:, :-1]
         inp_actions = actions_batch[:, :-1]
-        tgt_items   = items_batch[:, 1:]
+        tgt_items = items_batch[:, 1:]
         tgt_actions = actions_batch[:, 1:]
         
         seq_emb, neg_out, _ = model(inp_items, inp_actions)  # [B,S,emb], [B,S,emb]
@@ -115,7 +147,7 @@ for epoch in range(config.max_epochs):
         logits = torch.sum(seq_emb * tgt_emb, dim=-1)                 # B x (S-1)
 
         # mask => label != -1
-        pad_mask = (tgt_items != (num_items + 1)).float()             # 1 — учитывать
+        pad_mask = (tgt_actions == 1).float()             # ВОТ ЗДЕСЬ КОНЕЧНО БОЛЬШОЙ ВОПРОС ((tgt_actions == 0) | (tgt_actions == 1)).float()
 
         bce_loss = not_to_recommend_loss(logits, tgt_actions, pad_mask)
         reg_loss = negative_regularization(neg_out)
@@ -130,7 +162,7 @@ for epoch in range(config.max_epochs):
         pbar.set_description(f"Epoch {epoch} loss: {loss_sum/(batch_idx+1):.4f}")
 
     # Validation
-    evaluation_result= evaluate(
+    evaluation_result = evaluate(
         model,
         val_dataloader,
         config.metrics,
