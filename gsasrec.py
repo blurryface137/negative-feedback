@@ -91,17 +91,12 @@ class GSASRec(nn.Module):
 
         actions_batch = torch.where(actions_batch == -1, torch.zeros_like(actions_batch), actions_batch) # добавил эту строку
         pos_mask = (actions_batch == 1)
-        if pos_mask.sum(1).min() == 0:
-            # fallback: последний непаддинг, если нет покупок
-            no_pos = (pos_mask.sum(1) == 0)
-            last_valid = (items_batch != self.num_items + 1).sum(1) - 1
-            last_pos_idx = torch.where(
-             no_pos.unsqueeze(1), last_valid.unsqueeze(1), 
-             torch.where(pos_mask, positions, zeros)
-            ).argmax(dim=1)
+        positions = torch.arange(seqlen, device=actions_batch.device).expand_as(actions_batch)
+        last_pos_idx = torch.where(pos_mask, positions, torch.zeros_like(positions)).argmax(dim=1)
+        last_emb = seq_emb[torch.arange(bsz, device=items_batch.device), last_pos_idx, :]
 
         out_emb = self.get_output_embeddings().weight
-        scores  = torch.einsum("bd,nd->bn", last_emb, out_emb)
+        scores = torch.einsum("bd,nd->bn", last_emb, out_emb)
         scores[:, 0] = float("-inf")
         scores[:, self.num_items + 1:] = float("-inf")
 
@@ -118,7 +113,7 @@ class GSASRec(nn.Module):
         if rated is not None:
             for i, seen in enumerate(rated):
                 for itm in seen:
-                    if itm <= self.num_items:
+                    if 0 < itm <= self.num_items:
                         scores[i, itm] = float("-inf")
 
         return torch.topk(scores, topk, dim=1).indices, torch.topk(scores, topk, dim=1).values
