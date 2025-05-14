@@ -10,25 +10,21 @@ class MultiHeadAttention(nn.Module):
         self.query_proj = nn.Linear(dim, dim)
         self.key_proj = nn.Linear(dim, dim)
         self.val_proj = nn.Linear(dim, dim)
-        self.dropout = nn.Dropout(dropout_rate)  # Change the dropout rate as needed
+        self.dropout = nn.Dropout(dropout_rate)
 
     def forward(self, queries, keys, causality=False):
         Q = self.query_proj(queries)
         K = self.key_proj(keys)
         V = self.val_proj(keys)
 
-        # Split and concat
         Q_ = torch.cat(Q.chunk(self.num_heads, dim=2), dim=0)
         K_ = torch.cat(K.chunk(self.num_heads, dim=2), dim=0)
         V_ = torch.cat(V.chunk(self.num_heads, dim=2), dim=0)
 
-        # Multiplication
         outputs = torch.matmul(Q_, K_.transpose(1, 2))
 
-        # Scale
         outputs = outputs / (K_.size(-1) ** 0.5)
 
-        # Key Masking
         key_masks = torch.sign(torch.sum(torch.abs(keys), dim=-1))
         key_masks = key_masks.repeat(self.num_heads, 1)
         key_masks = key_masks.unsqueeze(1).repeat(1, queries.size(1), 1)
@@ -43,11 +39,9 @@ class MultiHeadAttention(nn.Module):
 
             outputs = outputs.masked_fill(masks == 0, float('-inf'))
 
-        # Activation
         outputs = F.softmax(outputs, dim=-1)
         outputs = torch.nan_to_num(outputs, nan=0.0, posinf=0.0, neginf=0.0)
 
-        # Query Masking
         query_masks = torch.sign(torch.sum(torch.abs(queries), dim=-1))
         query_masks = query_masks.repeat(self.num_heads, 1)
         query_masks = query_masks.unsqueeze(-1).repeat(1, 1, keys.size(1))
@@ -57,13 +51,10 @@ class MultiHeadAttention(nn.Module):
         attention_chunks = outputs.chunk(self.num_heads, dim=0)
         attention_weights = torch.stack(attention_chunks, dim=1)
 
-        # Dropouts
         outputs = self.dropout(outputs)
 
-        # Weighted sum
         outputs = torch.matmul(outputs, V_)
 
-        # Restore shape
         outputs = torch.cat(outputs.chunk(self.num_heads, dim=0), dim=2)
         return outputs, attention_weights
 
@@ -104,7 +95,6 @@ class TransformerBlock(nn.Module):
         # Add & Norm
         x = x + residual
 
-        # Apply mask if provided
         if mask is not None:
             x *= mask
         return x, attentions
