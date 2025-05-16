@@ -37,13 +37,12 @@ class NTRSASRec(nn.Module):
         ])
         self.seq_norm = nn.LayerNorm(self.embedding_dim)
 
-        # output embeddings (можно шарить с item_embedding)
+        # output embeddings
         if reuse_item_embeddings:
             self.output_embedding = None
         else:
             self.output_embedding = nn.Embedding(self.num_items + 2, self.embedding_dim)
 
-        # head для регуляризации негативов
         self.negative_head = nn.Linear(self.embedding_dim, self.embedding_dim)
 
     def get_output_embeddings(self):
@@ -73,7 +72,6 @@ class NTRSASRec(nn.Module):
             attns.append(att)
         seq = self.seq_norm(seq)
 
-        # отрицательная голова (для регуляризации)
         neg_mask = (action_ids == 0).float().unsqueeze(-1)
         neg_out = self.negative_head(seq) * neg_mask
 
